@@ -39,6 +39,19 @@ class OrdersTests(unittest.TestCase):
         main.init_db(self.db)
         self.assertEqual(len(main.get_orders(self.db)), 1)
 
+    def test_complete_order(self):
+        main.add_order('Анна', 'Торт', self.db)
+        main.add_order('Пётр', 'Пицца', self.db)
+        self.assertTrue(main.complete_order(2, self.db))
+        self.assertEqual([row[3] for row in main.get_orders(self.db)],
+                         ['Новый', 'Завершён'])
+
+    def test_complete_twice_or_missing(self):
+        main.add_order('Анна', 'Торт', self.db)
+        self.assertTrue(main.complete_order(1, self.db))
+        self.assertFalse(main.complete_order(1, self.db))
+        self.assertFalse(main.complete_order(99, self.db))
+
 
 if __name__ == '__main__':
     unittest.main()
