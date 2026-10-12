@@ -9,6 +9,7 @@ from tkinter import messagebox, ttk
 DB_PATH = Path(__file__).resolve().parent / 'business_orders.db'
 
 STATUS_NEW = 'Новый'
+STATUS_DONE = 'Завершён'
 
 
 # Работа с базой данных
@@ -48,6 +49,16 @@ def add_order(customer_name, order_details, db_path=None):
             (customer_name, order_details, STATUS_NEW),
         )
         return cursor.lastrowid
+
+
+def complete_order(order_id, db_path=None):
+    """Завершает заказ. False — если заказа нет или он уже завершён."""
+    with connect(db_path) as conn, conn:
+        cursor = conn.execute(
+            'UPDATE orders SET status = ? WHERE id = ? AND status != ?',
+            (STATUS_DONE, order_id, STATUS_DONE),
+        )
+        return cursor.rowcount == 1
 
 
 def get_orders(db_path=None):
@@ -91,6 +102,8 @@ class OrderApp:
         self.buttons.pack(fill=tk.X)
         ttk.Button(self.buttons, text='Добавить заказ',
                    command=self.add_order).pack(side=tk.LEFT)
+        ttk.Button(self.buttons, text='Завершить заказ',
+                   command=self.complete_order).pack(side=tk.LEFT, padx=10)
         # Enter в поле «Детали заказа» тоже добавляет заказ
         self.order_details_entry.bind('<Return>', lambda _: self.add_order())
 
@@ -100,6 +113,8 @@ class OrderApp:
             self.tree.heading(column, text=title)
             self.tree.column(column, width=width,
                              anchor=tk.CENTER if column == 'id' else tk.W)
+        # Завершённые заказы показываем серым
+        self.tree.tag_configure('done', foreground='gray')
         self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         self.customer_name_entry.focus()
@@ -117,10 +132,24 @@ class OrderApp:
         self.customer_name_entry.focus()
         self.view_orders()
 
+    def complete_order(self):
+        selected_item = self.tree.selection()
+        if not selected_item:
+            messagebox.showwarning('Предупреждение',
+                                   'Выберите заказ для завершения')
+            return
+        order_id = self.tree.item(selected_item[0], 'values')[0]
+        if not complete_order(int(order_id)):
+            messagebox.showinfo('Информация',
+                                f'Заказ №{order_id} уже завершён')
+            return
+        self.view_orders()
+
     def view_orders(self):
         self.tree.delete(*self.tree.get_children())
         for row in get_orders():
-            self.tree.insert('', tk.END, values=row)
+            tags = ('done',) if row[3] == STATUS_DONE else ()
+            self.tree.insert('', tk.END, values=row, tags=tags)
 
 
 def main():
